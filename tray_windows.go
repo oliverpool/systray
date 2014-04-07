@@ -106,14 +106,26 @@ func (p *_Systray) SetIcon(hicon HICON) error {
 	return nil
 }
 
-func (p *_Systray) WinProc(hwnd HWND, msg uint32, wparam, lparam uintptr) uintptr {
-	if msg == NotifyIconMessageId {
-		if lparam == WM_LBUTTONDBLCLK {
-			p.dclick()
-		} else if (lparam == WM_LBUTTONUP) {
-			p.lclick()
-		} else if (lparam ==  WM_RBUTTONUP) {
-			p.rclick()
+func (p *_Systray) WinProc(hwnd HWND, msg uint32, wparam uintptr, lparam uintptr) uintptr {
+	switch msg {
+	case NotifyIconMessageId :
+		switch lparam {
+		case WM_LBUTTONDBLCLK: p.dclick()
+		case WM_LBUTTONUP: p.lclick()
+		case WM_RBUTTONUP: p.rclick()
+		}
+	case WM_COMMAND :
+        cmdMsgId := int(wparam&0xffff)
+		switch (cmdMsgId) {
+		// *********************************************************
+		// Insert other commands we want to specifically handle here
+		// *********************************************************
+		default:
+			// See if this matches one of our menu item callbacks
+			if cmdMsgId >= MenuButtonBaseMessageId && cmdMsgId < (MenuButtonBaseMessageId+len(p.menuItemCallbacks)) {
+				itemIndex := cmdMsgId - MenuButtonBaseMessageId
+				p.menuItemCallbacks[itemIndex]()
+			}
 		}
 	}
 	result, _, _ := DefWindowProc.Call(uintptr(hwnd), uintptr(msg), wparam, lparam)
@@ -150,7 +162,7 @@ func _NewSystray(iconPath string, clientPath string, port int) *_Systray {
 }
 
 func _NewSystrayEx(iconPath string) (*_Systray, error) {
-	ni := &_Systray{iconPath, 0, 0, 0, func(){}, func(){}, func(){}}
+	ni := &_Systray{iconPath, 0, 0, 0, 0, make([]func(), 0, 10), func(){}, func(){}, func(){}}
 
 	MainClassName := "MainForm"
 	RegisterWindow(MainClassName, ni.WinProc)
@@ -225,6 +237,8 @@ type _Systray struct {
 	id uint32
 	mhwnd uintptr
 	hwnd uintptr
+	popupMenu uintptr
+	menuItemCallbacks []func()
 	lclick func()
 	rclick func()
 	dclick func()
@@ -276,6 +290,58 @@ func RegisterWindow(name string, proc WindowProc) error {
 		return errors.New("register class failed")
 	}
 	return nil
+}
+
+// TODO: Resolve tab vs space
+func (p *_Systray) CreateSystrayMenu(items map[string]func()) {
+    menu, _, _ := CreatePopupMenu.Call()
+    p.popupMenu = menu
+
+    var ret uintptr
+    var err uintptr
+
+    // Add callbacks to our list, mapping them to the id range dynamically
+    for key, callback := range items {
+        // First callback is MenuButtonBaseMessageId+0, second is MenuButtonBaseMessageId+1, etc.
+        itemID := MenuButtonBaseMessageId + len(p.menuItemCallbacks)
+        p.menuItemCallbacks = append(p.menuItemCallbacks, callback)
+        ret, err, _ = AppendMenu.Call(menu, MF_STRING, uintptr(itemID), uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(key))))
+        if ret == 0 {
+            println("AppendMenu failed", err)
+            return
+        }
+    }
+
+    var pos POINT
+    ret, _, _ = GetCursorPos.Call(uintptr(unsafe.Pointer(&pos)))
+    if ret == 0 {
+        println("GetCursorPos failed")
+        return
+    }
+
+    ret, _, _ = SetForegroundWindow.Call(p.hwnd)
+    if ret == 0 {
+        println("SetForegroundWindow failed")
+        return
+    }
+
+    ret, _, _ = TrackPopupMenu.Call(menu,
+                                TPM_LEFTALIGN,
+                                uintptr(pos.X),
+                                uintptr(pos.Y),
+                                0,
+                                p.hwnd,
+                                0)
+    if ret == 0 {
+        println("TrackPopupMenu failed")
+        return
+    }
+
+    ret, _, _ = PostMessage.Call(p.hwnd, WM_NULL, 0, 0)
+    if ret == 0 {
+        println("PostMessage failed")
+        return
+    }
 }
 
 type WindowProc func(hwnd HWND, msg uint32, wparam, lparam uintptr) uintptr
@@ -338,6 +404,8 @@ type (
 	HCURSOR HANDLE
 	HICON HANDLE
 	HWND HANDLE
+	HMENU HANDLE
+	HBITMAP HANDLE
 	HGDIOBJ HANDLE
 	HBRUSH HGDIOBJ
 )
@@ -381,9 +449,21 @@ const (
 	HWND_MESSAGE = ^HWND(2)
 	NOTIFYICON_VERSION = 3
 
+	// New stuff for menus
+	TPM_LEFTALIGN = 0x0000
+	WM_NULL = 0x0000
+	MIIM_FTYPE = 0x0100
+	MIIM_ID = 0x0002
+	MIIM_STRING = 0x0040
+	MFT_STRING = 0x0000
+	MF_STRING = 0x0000
+	WM_COMMAND = 0x0111
+
 	IDI_APPLICATION = 32512
 	WM_APP = 32768
 	NotifyIconMessageId = WM_APP + iota
+
+	MenuButtonBaseMessageId = WM_APP + 1024
 )
 
 var (
@@ -412,4 +492,12 @@ var (
 	LoadImage = user32.MustFindProc("LoadImageW")
 	LoadIcon = user32.MustFindProc("LoadIconW")
 	LoadCursor = user32.MustFindProc("LoadCursorW")
+
+	// New stuff for menus
+	PostMessage = user32.MustFindProc("PostMessageW")
+	GetCursorPos = user32.MustFindProc("GetCursorPos")
+	CreatePopupMenu = user32.MustFindProc("CreatePopupMenu")
+	TrackPopupMenu = user32.MustFindProc("TrackPopupMenu")
+	SetForegroundWindow = user32.MustFindProc("SetForegroundWindow")
+	AppendMenu = user32.MustFindProc("AppendMenuW")
 )
