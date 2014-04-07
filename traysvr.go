@@ -150,6 +150,10 @@ func (p *_SystraySvr) received(cmd map[string]string) {
 	}
 }
 
+func (p *_SystraySvr) CreateSystrayMenu(items map[string]func()) {
+}
+
+
 type _SystraySvr struct {
 	iconPath string
 	clientPath string
