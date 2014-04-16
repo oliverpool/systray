@@ -22,16 +22,7 @@ func (p *_Systray) Stop() error {
 }
 
 func (p *_Systray) Show(file string, hint string) error {
-	path := filepath.Join(p.iconPath, file)
-	path, err := filepath.Abs(path)
-	if err != nil {
-		return err
-	}
-	icon, err := NewIconFromFile(path)
-	if err != nil {
-		return err
-	}
-	err = p.SetIcon(HICON(icon))
+	err := p.SetIcon(file)
 	if err != nil {
 		return err
 	}
@@ -85,7 +76,18 @@ func (p *_Systray) SetVisible(visible bool) error {
 	return nil
 }
 
-func (p *_Systray) SetIcon(hicon HICON) error {
+func (p *_Systray) SetIcon(file string) error {
+	path := filepath.Join(p.iconPath, file)
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	icon, err := NewIconFromFile(path)
+	if err != nil {
+		return err
+	}
+	hicon := HICON(icon)
+
 	nid := NOTIFYICONDATA{
 		UID:  p.id,
 		HWnd: HWND(p.hwnd),
