@@ -116,8 +116,13 @@ func (p *_Systray) WinProc(hwnd HWND, msg uint32, wparam uintptr, lparam uintptr
 			p.dclick()
 		case WM_LBUTTONUP:
 			p.lclick()
+			if len(p.menuItemCallbacks) > 0 {
+				p.displaySystrayMenu()
+			}
 		case WM_RBUTTONUP:
 			p.rclick()
+		//case WM_LBUTTONDOWN:
+		//	p.lclick()
 		}
 	case WM_COMMAND:
 		cmdMsgId := int(wparam & 0xffff)
@@ -129,7 +134,7 @@ func (p *_Systray) WinProc(hwnd HWND, msg uint32, wparam uintptr, lparam uintptr
 			// See if this matches one of our menu item callbacks
 			if cmdMsgId >= MenuButtonBaseMessageId && cmdMsgId < (MenuButtonBaseMessageId+len(p.menuItemCallbacks)) {
 				itemIndex := cmdMsgId - MenuButtonBaseMessageId
-				p.menuItemCallbacks[itemIndex]()
+				p.menuItemCallbacks[itemIndex].callback()
 			}
 		}
 	}
@@ -158,7 +163,7 @@ func (p *_Systray) Run() error {
 	return nil
 }
 
-func _NewSystray(iconPath string, clientPath string, port int) *_Systray {
+func _NewSystray(iconPath string, clientPath string) *_Systray {
 	tray, err := _NewSystrayEx(iconPath)
 	if err != nil {
 		panic(err)
@@ -167,7 +172,7 @@ func _NewSystray(iconPath string, clientPath string, port int) *_Systray {
 }
 
 func _NewSystrayEx(iconPath string) (*_Systray, error) {
-	ni := &_Systray{iconPath, 0, 0, 0, 0, make([]func(), 0, 10), func() {}, func() {}, func() {}}
+	ni := &_Systray{iconPath, 0, 0, 0, 0, make([]CallbackInfo, 0, 10), func() {}, func() {}, func() {}}
 
 	MainClassName := "MainForm"
 	RegisterWindow(MainClassName, ni.WinProc)
@@ -237,13 +242,18 @@ func _NewSystrayEx(iconPath string) (*_Systray, error) {
 	return ni, nil
 }
 
+type CallbackInfo struct {
+    itemName string
+    callback func()
+}
+
 type _Systray struct {
 	iconPath          string
 	id                uint32
 	mhwnd             uintptr
 	hwnd              uintptr
 	popupMenu         uintptr
-	menuItemCallbacks []func()
+	menuItemCallbacks []CallbackInfo
 	lclick            func()
 	rclick            func()
 	dclick            func()
@@ -298,25 +308,34 @@ func RegisterWindow(name string, proc WindowProc) error {
 }
 
 // TODO: Resolve tab vs space
-func (p *_Systray) CreateSystrayMenu(items map[string]func()) {
-	menu, _, _ := CreatePopupMenu.Call()
-	p.popupMenu = menu
+func (p *_Systray) AddSystrayMenuItems(items map[string]func()) {
 
-	var ret uintptr
-	var err uintptr
 
 	// Add callbacks to our list, mapping them to the id range dynamically
 	for key, callback := range items {
+		var info CallbackInfo;
+		info.itemName = key
+		info.callback = callback
+		p.menuItemCallbacks = append(p.menuItemCallbacks, info)
+	}
+}
+
+func (p *_Systray) displaySystrayMenu() {
+	var ret uintptr
+	var err uintptr
+	
+	menu, _, _ := CreatePopupMenu.Call()
+	p.popupMenu = menu
+	for index, callbackInfo := range p.menuItemCallbacks {
 		// First callback is MenuButtonBaseMessageId+0, second is MenuButtonBaseMessageId+1, etc.
-		itemID := MenuButtonBaseMessageId + len(p.menuItemCallbacks)
-		p.menuItemCallbacks = append(p.menuItemCallbacks, callback)
-		ret, err, _ = AppendMenu.Call(menu, MF_STRING, uintptr(itemID), uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(key))))
+		itemID := MenuButtonBaseMessageId + index
+		ret, err, _ = AppendMenu.Call(menu, MF_STRING, uintptr(itemID), uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(callbackInfo.itemName))))
 		if ret == 0 {
 			println("AppendMenu failed", err)
 			return
 		}
 	}
-
+	
 	var pos POINT
 	ret, _, _ = GetCursorPos.Call(uintptr(unsafe.Pointer(&pos)))
 	if ret == 0 {
@@ -416,6 +435,7 @@ type (
 )
 
 const (
+	WM_LBUTTONDOWN   = 0x0201
 	WM_LBUTTONUP     = 0x0202
 	WM_LBUTTONDBLCLK = 0x0203
 	WM_RBUTTONUP     = 0x0205
