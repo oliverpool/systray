@@ -1,3 +1,18 @@
+Modified to directly invoke objc via cgo for darwin. This adds a tray_darwin.c source file
+and blends the original systray.Client standalone app functionality with that of the
+cgo-compiled integrated objc from github.com/cratonica/trayhost (which did a dock icon/menu
+for darwin and required cgo for all platforms).
+
+This carries two important ramifications:
+1) Darwin app (and linux, eventually) must be compiled on target platform
+   (or cross-compiled for cgo, when/if that happens officially)
+2) Systray.Run() *must* be executed on the main thread in order to play 
+   nice with Cocoa
+
+Also includes support for adding menu items with Go callbacks.
+
+[================== original content below ======================]
+
 Systray (Trayicon/Menu Extras)
 =======
 
