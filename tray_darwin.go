@@ -71,7 +71,7 @@ func (p *_Systray) SetVisible(visible bool) error {
 }
 
 func (p *_Systray) Run() error {
-    cTitle := C.CString("Spigot")
+    cTitle := C.CString(p.currentHint)
     defer C.free(unsafe.Pointer(cTitle))
     
     cIconPath := C.CString(filepath.Join(p.iconPath, p.currentIcon))
@@ -179,6 +179,7 @@ func menuCreatedCallback(manager unsafe.Pointer) {
             println("Adding callback for", info.ItemName)
             p.addItemToNativeMenu(info, idx)
         }
+        p.SetTooltip(p.currentHint)
     }
 }
 
