@@ -7,3 +7,10 @@ func New(iconPath string, clientPath string) *Systray {
 type Systray struct {
 	*_Systray
 }
+
+
+type CallbackInfo struct {
+    ItemName string
+    Callback func()
+}
+

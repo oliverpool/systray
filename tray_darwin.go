@@ -105,11 +105,6 @@ func _NewSystrayEx(iconPath string) (*_Systray, error) {
     return ni, nil
 }
 
-type CallbackInfo struct {
-    itemName string
-    callback func()
-}
-
 type _Systray struct {
     iconPath          string
     currentIcon       string
@@ -123,23 +118,12 @@ type _Systray struct {
 }
 
 
-func (p *_Systray) insertMenuItem(itemName string, callback func(), index int) {
-    println("Registering", itemName, callback)
-    info := CallbackInfo {
-        itemName : itemName,
-        callback : callback,
-    }
+func (p *_Systray) insertMenuItem(info CallbackInfo, index int) {
     // TODO - insert item into array at desired index
     p.menuItemCallbacks = append(p.menuItemCallbacks, info)
 }
 
-func (p *_Systray) appendMenuItem(itemName string, callback func()) {
-    println("Registering", itemName, callback)
-    info := CallbackInfo {
-        itemName : itemName,
-        callback : callback,
-    }
-    
+func (p *_Systray) appendMenuItem(info CallbackInfo) {
     index := len(p.menuItemCallbacks)
     p.menuItemCallbacks = append(p.menuItemCallbacks, info)
     if p.isCreated {
@@ -148,15 +132,15 @@ func (p *_Systray) appendMenuItem(itemName string, callback func()) {
 }
 
 func (p *_Systray) addItemToNativeMenu(info CallbackInfo, index int) {
-    cItemName := C.CString(info.itemName)
+    cItemName := C.CString(info.ItemName)
     defer C.free(unsafe.Pointer(cItemName))
     cIndex := C.uint(index)
     C.addSystrayMenuItem(cItemName, unsafe.Pointer(p), cIndex)
 }
 
-func (p *_Systray) AddSystrayMenuItems(items map[string]func()) {
-    for key, callback := range items {
-        p.appendMenuItem(key, callback)
+func (p *_Systray) AddSystrayMenuItems(items []CallbackInfo) {
+    for _, info := range items {
+        p.appendMenuItem(info)
     }
 }
 
@@ -168,7 +152,7 @@ func (p *_Systray) ClearSystrayMenuItems() {
 func (p *_Systray) handleMenuClick(index int) {
     println("Want to handle menu click for index", index)
     if index >= 0 && index < len(p.menuItemCallbacks) {
-        p.menuItemCallbacks[index].callback()
+        p.menuItemCallbacks[index].Callback()
     }
 }
 
@@ -192,7 +176,7 @@ func menuCreatedCallback(manager unsafe.Pointer) {
         p.isCreated = true
         // Add all previously registered callbacks to the menu
         for idx, info := range p.menuItemCallbacks {
-            println("Adding callback for", info.itemName)
+            println("Adding callback for", info.ItemName)
             p.addItemToNativeMenu(info, idx)
         }
     }

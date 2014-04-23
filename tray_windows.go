@@ -139,7 +139,7 @@ func (p *_Systray) WinProc(hwnd HWND, msg uint32, wparam uintptr, lparam uintptr
 			// See if this matches one of our menu item callbacks
 			if cmdMsgId >= MenuButtonBaseMessageId && cmdMsgId < (MenuButtonBaseMessageId+len(p.menuItemCallbacks)) {
 				itemIndex := cmdMsgId - MenuButtonBaseMessageId
-				p.menuItemCallbacks[itemIndex].callback()
+				p.menuItemCallbacks[itemIndex].Callback()
 			}
 		}
 	}
@@ -247,12 +247,6 @@ func _NewSystrayEx(iconPath string) (*_Systray, error) {
 	return ni, nil
 }
 
-type CallbackInfo struct {
-    itemName string
-    callback func()
-	enabled bool
-}
-
 type _Systray struct {
 	iconPath          string
 	id                uint32
@@ -314,14 +308,11 @@ func RegisterWindow(name string, proc WindowProc) error {
 }
 
 // TODO: Resolve tab vs space
-func (p *_Systray) AddSystrayMenuItems(items map[string]func()) {
+func (p *_Systray) AddSystrayMenuItems(items []CallbackInfo) {
 
 
 	// Add callbacks to our list, mapping them to the id range dynamically
-	for key, callback := range items {
-		var info CallbackInfo;
-		info.itemName = key
-		info.callback = callback
+	for _, info := range items {
 		p.menuItemCallbacks = append(p.menuItemCallbacks, info)
 	}
 }
@@ -339,7 +330,7 @@ func (p *_Systray) displaySystrayMenu() {
 	for index, callbackInfo := range p.menuItemCallbacks {
 		// First callback is MenuButtonBaseMessageId+0, second is MenuButtonBaseMessageId+1, etc.
 		itemID := MenuButtonBaseMessageId + index
-		ret, err, _ = AppendMenu.Call(menu, MF_STRING, uintptr(itemID), uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(callbackInfo.itemName))))
+		ret, err, _ = AppendMenu.Call(menu, MF_STRING, uintptr(itemID), uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(callbackInfo.ItemName))))
 		if ret == 0 {
 			println("AppendMenu failed", err)
 			return

@@ -31,12 +31,18 @@ func main() {
     tray := systray.New(iconDir, ".")
 
     //// Set some test menu items
-    items := make(map[string]func())
-    items["Test Menu 1"] = func() {
-        println("Got menu 1")
+    items := make([]systray.CallbackInfo, 2)
+    items[0] = systray.CallbackInfo {
+        ItemName : "Test Menu 1",
+        Callback : func() {
+            println("Got menu 1")
+        },
     }
-    items["Test Menu 2"] = func() {
-        println("Got menu 2")
+    items[1] = systray.CallbackInfo {
+        ItemName : "Test Menu 2",
+        Callback : func() {
+            println("Got menu 2")
+        },
     }
     tray.AddSystrayMenuItems(items)
 
