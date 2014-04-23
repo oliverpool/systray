@@ -14,13 +14,16 @@ import (
 #cgo darwin LDFLAGS: -framework Cocoa
 #include <stdlib.h>
 void runApplication(const char *title, const char *initialIcon, const char *initialHint, void *manager);
+void stopApplication(void);
 void addSystrayMenuItem(const char *item, void *, unsigned int index);
+void clearSystrayMenuItems(void);
 void setIcon(const char *path);
 void setHint(const char *hint);
 */
 import "C"
 
 func (p *_Systray) Stop() error {
+    C.stopApplication()
     return nil
 }
 
@@ -136,11 +139,12 @@ func (p *_Systray) appendMenuItem(itemName string, callback func()) {
         itemName : itemName,
         callback : callback,
     }
+    
+    index := len(p.menuItemCallbacks)
     p.menuItemCallbacks = append(p.menuItemCallbacks, info)
-    // This isn't valid prior to Run(), so skip it? Or do it only if
-    // the menu has been created (for later additions)?
-    // index := len(p.menuItemCallbacks) - 1
-    // p.addItemToNativeMenu(info, index)
+    if p.isCreated {
+        p.addItemToNativeMenu(info, index)
+    }
 }
 
 func (p *_Systray) addItemToNativeMenu(info CallbackInfo, index int) {
@@ -154,6 +158,11 @@ func (p *_Systray) AddSystrayMenuItems(items map[string]func()) {
     for key, callback := range items {
         p.appendMenuItem(key, callback)
     }
+}
+
+func (p *_Systray) ClearSystrayMenuItems() {
+    p.menuItemCallbacks = make([]CallbackInfo, 0, 10)
+    C.clearSystrayMenuItems()
 }
 
 func (p *_Systray) handleMenuClick(index int) {

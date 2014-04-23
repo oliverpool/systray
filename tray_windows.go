@@ -18,6 +18,11 @@ func (p *_Systray) Stop() error {
 	if ret == 0 {
 		return errors.New("shell notify delete failed")
 	}
+	ret, _, _ = PostMessage.Call(p.hwnd, WM_QUIT, 0, 0)
+	if ret == 0 {
+		println("PostMessage failed")
+		return nil
+	}
 	return nil
 }
 
@@ -245,6 +250,7 @@ func _NewSystrayEx(iconPath string) (*_Systray, error) {
 type CallbackInfo struct {
     itemName string
     callback func()
+	enabled bool
 }
 
 type _Systray struct {
@@ -318,6 +324,10 @@ func (p *_Systray) AddSystrayMenuItems(items map[string]func()) {
 		info.callback = callback
 		p.menuItemCallbacks = append(p.menuItemCallbacks, info)
 	}
+}
+
+func (p *_Systray) ClearSystrayMenuItems() {
+	p.menuItemCallbacks = make([]CallbackInfo, 0, 10)
 }
 
 func (p *_Systray) displaySystrayMenu() {
@@ -477,6 +487,7 @@ const (
 	// New stuff for menus
 	TPM_LEFTALIGN = 0x0000
 	WM_NULL       = 0x0000
+	WM_QUIT       = 0x0012
 	MIIM_FTYPE    = 0x0100
 	MIIM_ID       = 0x0002
 	MIIM_STRING   = 0x0040

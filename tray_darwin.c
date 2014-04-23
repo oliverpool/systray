@@ -16,6 +16,7 @@ typedef struct {
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification;
 - (void)showIcon:(NSString*)path hint:(NSString *)hint;
 - (void)addMenuItem:(NSString*)item manager:(void*)manager index:(int)index callback:(CallbackFunc)callback;
+- (void)clearMenuItems;
 
 - (IBAction)clicked:(id)sender;
 - (IBAction)quit:(id)sender;
@@ -100,6 +101,13 @@ const char *m_initialHint;
     [[self.statusItem menu] insertItem:newItem atIndex:insertionIndex];
 }
 
+- (void)clearMenuItems {
+    // NOTE: if we let the calling app handle Quit, then this can just be removeAllItems
+    while ([[self.statusItem menu] numberOfItems] > 1) {
+        [[self.statusItem menu] removeItemAtIndex:0];
+    }
+}
+
 // Process a previously added menu item, extracting the callback info and invoking
 // the callback
 - (IBAction)menuItem:(id)sender {
@@ -117,6 +125,7 @@ const char *m_initialHint;
 - (IBAction)clicked:(id)sender {
     // This could include a generic callback over the fence to Go
     // if we want to do something like reset an idle timer.
+    // Fun fact: this does not get called if a menu is set, so utility is limited
     //NSLog(@"clicked");
 }
 
@@ -148,7 +157,6 @@ const char *m_initialHint;
         }
     }
     if (hint) {
-        NSLog(@"Setting icon hint");
         [self.statusItem setToolTip:hint];
     }
 }
@@ -162,6 +170,8 @@ const char *m_initialHint;
 
 // TODO: Enforce the main thread restriction earlier, rather than letting some
 // NS code assert
+// TODO: Consider breaking this into separate setup and run functions, so the app
+// can be stopped and restarted
 void runApplication(const char *title,
                     const char *initialIcon,
                     const char *initialHint,
@@ -178,6 +188,10 @@ void runApplication(const char *title,
     [NSApp run];
 }
 
+void stopApplication(void) {
+    [NSApplication sharedApplication];
+    [NSApp stop:nil];
+}
 
 // Set the currently displayed icon
 // TODO: figure out how we want to pass unicode
@@ -196,5 +210,9 @@ void setHint(const char *hint) {
 // the other side
 void addSystrayMenuItem(const char *item, void *object, unsigned int index) {
     [[NSApp delegate] addMenuItem:[NSString stringWithCString:item encoding:NSASCIIStringEncoding] manager:object index:index callback:&menuClickCallback];
+}
+
+void clearSystrayMenuItems(void) {
+    [[NSApp delegate] clearMenuItems];
 }
 
