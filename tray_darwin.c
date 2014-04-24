@@ -7,6 +7,7 @@ typedef struct {
     void *manager;      // The Go object that will handle the click
     unsigned int index; // Representative index of which go-side callback to invoke
     CallbackFunc callback;
+    bool enabled;
 } MenuCallbackInfo;
 
 @interface AppDelegate: NSObject <NSApplicationDelegate>
@@ -15,11 +16,10 @@ typedef struct {
 }
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification;
 - (void)showIcon:(NSString*)path hint:(NSString *)hint;
-- (void)addMenuItem:(NSString*)item manager:(void*)manager index:(int)index callback:(CallbackFunc)callback;
+- (void)addMenuItem:(NSString*)item manager:(void*)manager index:(int)index enabled:(bool)enabled callback:(CallbackFunc)callback;
 - (void)clearMenuItems;
 
 - (IBAction)clicked:(id)sender;
-- (IBAction)quit:(id)sender;
 - (IBAction)menuItem:(id)sender;
 
 
@@ -61,12 +61,11 @@ const char *m_initialHint;
 
     // Create our menu and add some items
     NSMenu *statusMenu = [[NSMenu allocWithZone:[NSMenu menuZone]] initWithTitle:@"Custom"];
+    [statusMenu setAutoenablesItems:NO];
     
-    // Add a default Quit item
-    NSMenuItem *quitItem = [[NSMenuItem allocWithZone:[NSMenu menuZone]] initWithTitle:@"Quit" action:@selector(quit:) keyEquivalent:@""];
-    [quitItem setEnabled:YES];
-    [statusMenu addItem:quitItem];
-
+    // TODO: the app is now solely responsible for managing termination, so we don't add the
+    // default Quit item - consider whether or not a placeholder or label item should be added
+    // in its stead
     [self.statusItem setMenu:statusMenu];
 
     // Set up an icon cache for loaded image data
@@ -83,29 +82,25 @@ const char *m_initialHint;
 }
 
 // Add a new menu item, with callback and metadata
-- (void)addMenuItem:(NSString*)item manager:(void*)manager index:(int)index callback:(CallbackFunc)callback {
+- (void)addMenuItem:(NSString*)item manager:(void*)manager index:(int)index enabled:(bool)enabled callback:(CallbackFunc)callback {
     MenuCallbackInfo callbackInfo;
     callbackInfo.manager = manager;
     callbackInfo.index = index;
     callbackInfo.callback = callback;
+    callbackInfo.enabled = enabled;
     NSMenuItem *newItem = [[NSMenuItem allocWithZone:[NSMenu menuZone]] initWithTitle:item action:@selector(menuItem:) keyEquivalent:@""];
-    [newItem setEnabled:YES];
+    if (enabled) {
+        [newItem setEnabled:YES];
+    } else {
+        [newItem setEnabled:NO];
+    }
     [newItem setRepresentedObject:[NSValue value:&callbackInfo withObjCType:@encode(MenuCallbackInfo)]];
     
-    // Implicitly leave the last item ("Quit") at the end
-    int insertionIndex = [[self.statusItem menu] numberOfItems] - 1;
-    if (insertionIndex < 0) {
-        // No items added yet
-        insertionIndex = 0;
-    }
-    [[self.statusItem menu] insertItem:newItem atIndex:insertionIndex];
+    [[self.statusItem menu] addItem:newItem];
 }
 
 - (void)clearMenuItems {
-    // NOTE: if we let the calling app handle Quit, then this can just be removeAllItems
-    while ([[self.statusItem menu] numberOfItems] > 1) {
-        [[self.statusItem menu] removeItemAtIndex:0];
-    }
+    [[self.statusItem menu] removeAllItems];
 }
 
 // Process a previously added menu item, extracting the callback info and invoking
@@ -128,15 +123,6 @@ const char *m_initialHint;
     // Fun fact: this does not get called if a menu is set, so utility is limited
     //NSLog(@"clicked");
 }
-
-// Exit the application (or signal an exit elsewhere, or just return and thereby
-// imply an exit...)
-- (IBAction)quit:(id)sender {
-    // TODO: wire this to a callback, instead of just exiting
-    NSLog(@"quit!!!");
-    [NSApp terminate:self];
-}
-
 
 // Set the menubar icon and hint, if any. Either value may
 // be nil, in which case no action is taken.
@@ -208,8 +194,12 @@ void setHint(const char *hint) {
 
 // Add a new item to the menu, with some (opaque) info on how to process it back on
 // the other side
-void addSystrayMenuItem(const char *item, void *object, unsigned int index) {
-    [[NSApp delegate] addMenuItem:[NSString stringWithCString:item encoding:NSASCIIStringEncoding] manager:object index:index callback:&menuClickCallback];
+void addSystrayMenuItem(const char *item, void *object, unsigned int index, unsigned char enabled) {
+    [[NSApp delegate] addMenuItem:[NSString stringWithCString:item encoding:NSASCIIStringEncoding]
+                                   manager:object
+                                   index:index
+                                   enabled:enabled
+                                   callback:&menuClickCallback];
 }
 
 void clearSystrayMenuItems(void) {

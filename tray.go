@@ -12,5 +12,6 @@ type Systray struct {
 type CallbackInfo struct {
     ItemName string
     Callback func()
+	Disabled bool
 }
 

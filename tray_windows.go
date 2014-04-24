@@ -330,7 +330,11 @@ func (p *_Systray) displaySystrayMenu() {
 	for index, callbackInfo := range p.menuItemCallbacks {
 		// First callback is MenuButtonBaseMessageId+0, second is MenuButtonBaseMessageId+1, etc.
 		itemID := MenuButtonBaseMessageId + index
-		ret, err, _ = AppendMenu.Call(menu, MF_STRING, uintptr(itemID), uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(callbackInfo.ItemName))))
+		flags := MF_STRING
+		if callbackInfo.Disabled {
+			flags = flags | MF_GRAYED
+		}
+		ret, err, _ = AppendMenu.Call(menu, uintptr(flags), uintptr(itemID), uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(callbackInfo.ItemName))))
 		if ret == 0 {
 			println("AppendMenu failed", err)
 			return
@@ -484,6 +488,7 @@ const (
 	MIIM_STRING   = 0x0040
 	MFT_STRING    = 0x0000
 	MF_STRING     = 0x0000
+	MF_GRAYED     = 0x0001
 	WM_COMMAND    = 0x0111
 
 	IDI_APPLICATION     = 32512

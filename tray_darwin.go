@@ -15,7 +15,7 @@ import (
 #include <stdlib.h>
 void runApplication(const char *title, const char *initialIcon, const char *initialHint, void *manager);
 void stopApplication(void);
-void addSystrayMenuItem(const char *item, void *, unsigned int index);
+void addSystrayMenuItem(const char *item, void *, unsigned int index, unsigned char enabled);
 void clearSystrayMenuItems(void);
 void setIcon(const char *path);
 void setHint(const char *hint);
@@ -135,7 +135,13 @@ func (p *_Systray) addItemToNativeMenu(info CallbackInfo, index int) {
     cItemName := C.CString(info.ItemName)
     defer C.free(unsafe.Pointer(cItemName))
     cIndex := C.uint(index)
-    C.addSystrayMenuItem(cItemName, unsafe.Pointer(p), cIndex)
+    var cEnabled C.uchar
+    if info.Disabled || info.Callback == nil {
+        cEnabled = C.uchar(0)
+    } else {
+        cEnabled = C.uchar(1)
+    }
+    C.addSystrayMenuItem(cItemName, unsafe.Pointer(p), cIndex, cEnabled)
 }
 
 func (p *_Systray) AddSystrayMenuItems(items []CallbackInfo) {
