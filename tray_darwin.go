@@ -152,7 +152,9 @@ func (p *_Systray) AddSystrayMenuItems(items []CallbackInfo) {
 
 func (p *_Systray) ClearSystrayMenuItems() {
     p.menuItemCallbacks = make([]CallbackInfo, 0, 10)
-    C.clearSystrayMenuItems()
+    if p.isCreated {
+        C.clearSystrayMenuItems()
+    } 
 }
 
 func (p *_Systray) handleMenuClick(index int) {
