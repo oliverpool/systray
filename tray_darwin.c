@@ -13,6 +13,7 @@ typedef struct {
 @interface AppDelegate: NSObject <NSApplicationDelegate>
 {
     NSMutableDictionary *icons;
+    NSStatusItem *_statusItem;
 }
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification;
 - (void)showIcon:(NSString*)path hint:(NSString *)hint;
@@ -23,7 +24,7 @@ typedef struct {
 - (IBAction)menuItem:(id)sender;
 
 
-@property (strong) NSStatusItem *statusItem;
+@property (readwrite, retain) NSStatusItem *statusItem;
 @property (assign) IBOutlet NSWindow *window;
 
 @end
@@ -35,6 +36,7 @@ const char *m_initialIconPath;
 const char *m_initialHint;
 
 @synthesize window = _window;
+@synthesize statusItem = _statusItem;
 
 - (id)init:(void *)manager iconPath:(const char *)iconPath hint:(const char*)hint{
     if ((self = [super init])) {
@@ -45,13 +47,17 @@ const char *m_initialHint;
     return self;
 }
 
+- (void)dealloc {
+    [_statusItem release]; _statusItem = nil;
+    [super dealloc];
+}
+
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification
 {
-    NSLog(@"In applicationDidFinishLaunching");
+    NSLog(@"Setting up menubar");
 
     // Create a menubar item
     self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
-    NSLog(@"Created status item");
 
     // Useful for debugging if icon loading is broken (e.g., icons don't exist)
     //[self.statusItem setTitle:@"SystrayTest"];
@@ -60,7 +66,7 @@ const char *m_initialHint;
     [self.statusItem setAction:@selector(clicked:)];
 
     // Create our menu and add some items
-    NSMenu *statusMenu = [[NSMenu allocWithZone:[NSMenu menuZone]] initWithTitle:@"Custom"];
+    NSMenu *statusMenu = [[[NSMenu allocWithZone:[NSMenu menuZone]] initWithTitle:@"Custom"] autorelease];
     [statusMenu setAutoenablesItems:NO];
     
     // TODO: the app is now solely responsible for managing termination, so we don't add the
@@ -88,7 +94,7 @@ const char *m_initialHint;
     callbackInfo.index = index;
     callbackInfo.callback = callback;
     callbackInfo.enabled = enabled;
-    NSMenuItem *newItem = [[NSMenuItem allocWithZone:[NSMenu menuZone]] initWithTitle:item action:@selector(menuItem:) keyEquivalent:@""];
+    NSMenuItem *newItem = [[[NSMenuItem allocWithZone:[NSMenu menuZone]] initWithTitle:item action:@selector(menuItem:) keyEquivalent:@""] autorelease];
     if (enabled) {
         [newItem setEnabled:YES];
     } else {
@@ -132,7 +138,7 @@ const char *m_initialHint;
         NSImage *icon = [icons objectForKey:path];
         if (!icon) {
             NSLog(@"Creating new icon from file");
-            icon = [[NSImage alloc] initWithContentsOfFile:path];
+            icon = [[[NSImage alloc] initWithContentsOfFile:path] autorelease];
             if (icon) {
                 [icons setValue:icon forKey:path];
             }
@@ -174,6 +180,7 @@ void runApplication(const char *title,
     [NSApp run];
 }
 
+// Stop the application
 void stopApplication(void) {
     [NSApplication sharedApplication];
     [NSApp stop:nil];
@@ -188,6 +195,7 @@ void setIcon(const char *path) {
 
 // Set the currently displayed hint
 void setHint(const char *hint) {
+    [NSAutoreleasePool new];
     NSString *nsHint = [NSString stringWithCString:hint encoding:NSASCIIStringEncoding];
     [[NSApp delegate] showIcon:nil hint:nsHint];
 }
@@ -195,6 +203,7 @@ void setHint(const char *hint) {
 // Add a new item to the menu, with some (opaque) info on how to process it back on
 // the other side
 void addSystrayMenuItem(const char *item, void *object, unsigned int index, unsigned char enabled) {
+    [NSAutoreleasePool new];
     [[NSApp delegate] addMenuItem:[NSString stringWithCString:item encoding:NSASCIIStringEncoding]
                                    manager:object
                                    index:index
@@ -202,7 +211,9 @@ void addSystrayMenuItem(const char *item, void *object, unsigned int index, unsi
                                    callback:&menuClickCallback];
 }
 
+// Clear all existing items from the menu
 void clearSystrayMenuItems(void) {
+    [NSAutoreleasePool new];
     [[NSApp delegate] clearMenuItems];
 }
 
