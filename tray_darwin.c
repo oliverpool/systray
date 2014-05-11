@@ -8,6 +8,7 @@ typedef struct {
     unsigned int index; // Representative index of which go-side callback to invoke
     CallbackFunc callback;
     bool enabled;
+    bool checked;
 } MenuCallbackInfo;
 
 @interface AppDelegate: NSObject <NSApplicationDelegate>
@@ -17,7 +18,7 @@ typedef struct {
 }
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification;
 - (void)showIcon:(NSString*)path hint:(NSString *)hint;
-- (void)addMenuItem:(NSString*)item manager:(void*)manager index:(int)index enabled:(bool)enabled callback:(CallbackFunc)callback;
+- (void)addMenuItem:(NSString*)item manager:(void*)manager index:(int)index enabled:(bool)enabled checked:(bool)checked callback:(CallbackFunc)callback;
 - (void)clearMenuItems;
 
 - (IBAction)clicked:(id)sender;
@@ -88,17 +89,21 @@ const char *m_initialHint;
 }
 
 // Add a new menu item, with callback and metadata
-- (void)addMenuItem:(NSString*)item manager:(void*)manager index:(int)index enabled:(bool)enabled callback:(CallbackFunc)callback {
+- (void)addMenuItem:(NSString*)item manager:(void*)manager index:(int)index enabled:(bool)enabled checked:(bool)checked callback:(CallbackFunc)callback {
     MenuCallbackInfo callbackInfo;
     callbackInfo.manager = manager;
     callbackInfo.index = index;
     callbackInfo.callback = callback;
     callbackInfo.enabled = enabled;
+    callbackInfo.checked = checked;
     NSMenuItem *newItem = [[[NSMenuItem allocWithZone:[NSMenu menuZone]] initWithTitle:item action:@selector(menuItem:) keyEquivalent:@""] autorelease];
     if (enabled) {
         [newItem setEnabled:YES];
     } else {
         [newItem setEnabled:NO];
+    }
+    if (checked) {
+        [newItem setState:NSOnState]
     }
     [newItem setRepresentedObject:[NSValue value:&callbackInfo withObjCType:@encode(MenuCallbackInfo)]];
     
@@ -202,12 +207,13 @@ void setHint(const char *hint) {
 
 // Add a new item to the menu, with some (opaque) info on how to process it back on
 // the other side
-void addSystrayMenuItem(const char *item, void *object, unsigned int index, unsigned char enabled) {
+void addSystrayMenuItem(const char *item, void *object, unsigned int index, unsigned char enabled, unsigned char checked) {
     [NSAutoreleasePool new];
     [[NSApp delegate] addMenuItem:[NSString stringWithCString:item encoding:NSASCIIStringEncoding]
                                    manager:object
                                    index:index
                                    enabled:enabled
+                                   checked:checked
                                    callback:&menuClickCallback];
 }
 

@@ -334,6 +334,9 @@ func (p *_Systray) displaySystrayMenu() {
 		if callbackInfo.Disabled {
 			flags = flags | MF_GRAYED
 		}
+		if callbackInfo.Checked {
+			flags = flags | MF_CHECKED
+		}
 		ret, err, _ = AppendMenu.Call(menu, uintptr(flags), uintptr(itemID), uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(callbackInfo.ItemName))))
 		if ret == 0 {
 			println("AppendMenu failed", err)
@@ -490,6 +493,8 @@ const (
 	MF_STRING     = 0x0000
 	MF_GRAYED     = 0x0001
 	WM_COMMAND    = 0x0111
+	MF_CHECKED    = 0x0008
+	MF_UNCHECKED  = 0x0000
 
 	IDI_APPLICATION     = 32512
 	WM_APP              = 32768
