@@ -103,7 +103,7 @@ const char *m_initialHint;
         [newItem setEnabled:NO];
     }
     if (checked) {
-        [newItem setState:NSOnState]
+        [newItem setState:NSOnState];
     }
     [newItem setRepresentedObject:[NSValue value:&callbackInfo withObjCType:@encode(MenuCallbackInfo)]];
     
