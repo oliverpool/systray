@@ -134,13 +134,11 @@ func (p *_Systray) WinProc(hwnd HWND, msg uint32, wparam uintptr, lparam uintptr
 			p.dclick()
 		case WM_LBUTTONUP:
 			p.lclick()
+		case WM_RBUTTONUP:
+			p.rclick()
 			if len(p.menuItemCallbacks) > 0 {
 				p.displaySystrayMenu()
 			}
-		case WM_RBUTTONUP:
-			p.rclick()
-			//case WM_LBUTTONDOWN:
-			//	p.lclick()
 		}
 	case WM_COMMAND:
 		cmdMsgId := int(wparam & 0xffff)
