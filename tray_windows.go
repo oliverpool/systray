@@ -26,7 +26,7 @@ func (p *_Systray) Stop() error {
 	return nil
 }
 
-func (p *_Systray) Show(file string, hint string) error {
+func (p *_Systray) Show(file interface{}, hint string) error {
 	err := p.SetIcon(file)
 	if err != nil {
 		return err
@@ -81,15 +81,27 @@ func (p *_Systray) SetVisible(visible bool) error {
 	return nil
 }
 
-func (p *_Systray) SetIcon(file string) error {
-	path := filepath.Join(p.iconPath, file)
-	path, err := filepath.Abs(path)
-	if err != nil {
-		return err
-	}
-	icon, err := NewIconFromFile(path)
-	if err != nil {
-		return err
+func (p *_Systray) SetIcon(file interface{}) (err error) {
+	var icon uintptr
+
+	switch file.(type) {
+	case string:
+		path := filepath.Join(p.iconPath, file.(string))
+		path, err = filepath.Abs(path)
+		if err != nil {
+			return
+		}
+		icon, err = NewIconFromFile(path)
+		if err != nil {
+			return
+		}
+	case int:
+		icon, err = NewIconFromResource(uintptr(file.(int)))
+		if err != nil {
+			return
+		}
+	default:
+		err = errors.New("invalid icon parameter")
 	}
 	hicon := HICON(icon)
 
@@ -108,9 +120,10 @@ func (p *_Systray) SetIcon(file string) error {
 
 	ret, _, _ := Shell_NotifyIcon.Call(NIM_MODIFY, uintptr(unsafe.Pointer(&nid)))
 	if ret == 0 {
-		return errors.New("shell notify icon failed")
+		err = errors.New("shell notify icon failed")
+		return
 	}
-	return nil
+	return
 }
 
 func (p *_Systray) WinProc(hwnd HWND, msg uint32, wparam uintptr, lparam uintptr) uintptr {
@@ -126,8 +139,8 @@ func (p *_Systray) WinProc(hwnd HWND, msg uint32, wparam uintptr, lparam uintptr
 			}
 		case WM_RBUTTONUP:
 			p.rclick()
-		//case WM_LBUTTONDOWN:
-		//	p.lclick()
+			//case WM_LBUTTONDOWN:
+			//	p.lclick()
 		}
 	case WM_COMMAND:
 		cmdMsgId := int(wparam & 0xffff)
@@ -165,7 +178,6 @@ func (p *_Systray) Run() error {
 			DispatchMessage.Call(uintptr(unsafe.Pointer(&msg)))
 		}
 	}
-	return nil
 }
 
 func _NewSystray(iconPath string, clientPath string) *_Systray {
@@ -277,6 +289,24 @@ func NewIconFromFile(filePath string) (uintptr, error) {
 	return hicon, nil
 }
 
+func NewIconFromResource(resourceID uintptr) (uintptr, error) {
+	moduleHandle, _, _ := GetModuleHandle.Call(uintptr(0))
+	if moduleHandle == 0 {
+		return 0, errors.New("could not get module handle")
+	}
+	hicon, _, err := LoadImage.Call(
+		moduleHandle,
+		resourceID,
+		IMAGE_ICON,
+		0,
+		0,
+		LR_DEFAULTSIZE|LR_SHARED)
+	if hicon == 0 {
+		return 0, errors.New("load resource failed: " + err.Error())
+	}
+	return hicon, nil
+}
+
 func RegisterWindow(name string, proc WindowProc) error {
 	hinst, _, _ := GetModuleHandle.Call(0)
 	if hinst == 0 {
@@ -310,7 +340,6 @@ func RegisterWindow(name string, proc WindowProc) error {
 // TODO: Resolve tab vs space
 func (p *_Systray) AddSystrayMenuItems(items []CallbackInfo) {
 
-
 	// Add callbacks to our list, mapping them to the id range dynamically
 	for _, info := range items {
 		p.menuItemCallbacks = append(p.menuItemCallbacks, info)
@@ -324,7 +353,7 @@ func (p *_Systray) ClearSystrayMenuItems() {
 func (p *_Systray) displaySystrayMenu() {
 	var ret uintptr
 	var err uintptr
-	
+
 	menu, _, _ := CreatePopupMenu.Call()
 	p.popupMenu = menu
 	for index, callbackInfo := range p.menuItemCallbacks {
@@ -343,7 +372,7 @@ func (p *_Systray) displaySystrayMenu() {
 			return
 		}
 	}
-	
+
 	var pos POINT
 	ret, _, _ = GetCursorPos.Call(uintptr(unsafe.Pointer(&pos)))
 	if ret == 0 {
@@ -470,6 +499,7 @@ const (
 	IMAGE_ICON      = 1
 	LR_LOADFROMFILE = 0x00000010
 	LR_DEFAULTSIZE  = 0x00000040
+	LR_SHARED       = 0x00008000
 
 	IDC_ARROW     = 32512
 	COLOR_WINDOW  = 5
